@@ -1,329 +1,275 @@
-{
-  "nbformat": 4,
-  "nbformat_minor": 0,
-  "metadata": {
-    "colab": {
-      "provenance": [],
-      "authorship_tag": "ABX9TyPJbMFoBu00VAT8YIsFAZCL",
-      "include_colab_link": true
-    },
-    "kernelspec": {
-      "name": "python3",
-      "display_name": "Python 3"
-    },
-    "language_info": {
-      "name": "python"
-    }
-  },
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {
-        "id": "view-in-github",
-        "colab_type": "text"
-      },
-      "source": [
-        "<a href=\"https://colab.research.google.com/github/taliaharon78/datasciencecoursera/blob/master/download_abide_preproc.py\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": 6,
-      "metadata": {
-        "colab": {
-          "base_uri": "https://localhost:8080/",
-          "height": 131
-        },
-        "id": "B4A1EECu23Go",
-        "outputId": "8647995d-734d-4a6b-a8bf-9c512a2c1ea1"
-      },
-      "outputs": [
-        {
-          "output_type": "error",
-          "ename": "SyntaxError",
-          "evalue": "ignored",
-          "traceback": [
-            "\u001b[0;36m  File \u001b[0;32m\"<ipython-input-6-e4f8879658a2>\"\u001b[0;36m, line \u001b[0;32m274\u001b[0m\n\u001b[0;31m    collect_and_download(-d reho, -p cpac, -s nofilt_noglobal, -o /path/to/local/download/dir)\u001b[0m\n\u001b[0m                            ^\u001b[0m\n\u001b[0;31mSyntaxError\u001b[0m\u001b[0;31m:\u001b[0m invalid syntax\n"
-          ]
-        }
-      ],
-      "source": [
-        "# download_abide_preproc.py\n",
-        "#\n",
-        "# Author: Daniel Clark, 2015\n",
-        "# Updated to python 3 and to support downloading by DX, Cameron Craddock, 2019\n",
-        "\n",
-        "\"\"\"\n",
-        "This script downloads data from the Preprocessed Connetomes Project's\n",
-        "ABIDE Preprocessed data release and stores the files in a local\n",
-        "directory; users specify derivative, pipeline, strategy, and optionally\n",
-        "age ranges, sex, site of interest\n",
-        "Usage:\n",
-        "    python download_abide_preproc.py -d <derivative> -p <pipeline>\n",
-        "                                     -s <strategy> -o <out_dir>\n",
-        "                                     [-lt <less_than>] [-gt <greater_than>]\n",
-        "                                     [-x <sex>] [-t <site>]\n",
-        "\"\"\"\n",
-        "\n",
-        "\n",
-        "# Main collect and download function\n",
-        "def collect_and_download(derivative, pipeline, strategy, out_dir, less_than, greater_than, site, sex, diagnosis):\n",
-        "    \"\"\"\n",
-        "    Function to collect and download images from the ABIDE preprocessed\n",
-        "    directory on FCP-INDI's S3 bucket\n",
-        "    Parameters\n",
-        "    ----------\n",
-        "    derivative : string\n",
-        "        derivative or measure of interest\n",
-        "    pipeline : string\n",
-        "        pipeline used to process data of interest\n",
-        "    strategy : string\n",
-        "        noise removal strategy used to process data of interest\n",
-        "    out_dir : string\n",
-        "        filepath to a local directory to save files to\n",
-        "    less_than : float\n",
-        "        upper age (years) threshold for participants of interest\n",
-        "    greater_than : float\n",
-        "        lower age (years) threshold for participants of interest\n",
-        "    site : string\n",
-        "        acquisition site of interest\n",
-        "    sex : string\n",
-        "        'M' or 'F' to indicate whether to download male or female data\n",
-        "    diagnosis : string\n",
-        "        'asd', 'tdc', or 'both' corresponding to the diagnosis of the\n",
-        "        participants for whom data should be downloaded\n",
-        "    Returns\n",
-        "    -------\n",
-        "    None\n",
-        "        this function does not return a value; it downloads data from\n",
-        "        S3 to a local directory\n",
-        "    :param derivative: \n",
-        "    :param pipeline: \n",
-        "    :param strategy: \n",
-        "    :param out_dir: \n",
-        "    :param less_than: \n",
-        "    :param greater_than: \n",
-        "    :param site: \n",
-        "    :param sex:\n",
-        "    :param diagnosis:\n",
-        "    :return: \n",
-        "    \"\"\"\n",
-        "\n",
-        "    # Import packages\n",
-        "    import os\n",
-        "    import urllib.request as request\n",
-        "\n",
-        "    # Init variables\n",
-        "    mean_fd_thresh = 0.2\n",
-        "    s3_prefix = 'https://s3.amazonaws.com/fcp-indi/data/Projects/'\\\n",
-        "                'ABIDE_Initiative'\n",
-        "    s3_pheno_path = '/'.join([s3_prefix, 'Phenotypic_V1_0b_preprocessed1.csv'])\n",
-        "\n",
-        "    # Format input arguments to be lower case, if not already\n",
-        "    derivative = derivative.lower()\n",
-        "    pipeline = pipeline.lower()\n",
-        "    strategy = strategy.lower()\n",
-        "\n",
-        "    # Check derivative for extension\n",
-        "    if 'roi' in derivative:\n",
-        "        extension = '.1D'\n",
-        "    else:\n",
-        "        extension = '.nii.gz'\n",
-        "\n",
-        "    # If output path doesn't exist, create it\n",
-        "    if not os.path.exists(out_dir):\n",
-        "        print('Could not find {0}, creating now...'.format(out_dir))\n",
-        "        os.makedirs(out_dir)\n",
-        "\n",
-        "    # Load the phenotype file from S3\n",
-        "    s3_pheno_file = request.urlopen(s3_pheno_path)\n",
-        "    pheno_list = s3_pheno_file.readlines()\n",
-        "    print(pheno_list[0])\n",
-        "\n",
-        "    # Get header indices\n",
-        "    header = pheno_list[0].decode().split(',')\n",
-        "    try:\n",
-        "        site_idx = header.index('SITE_ID')\n",
-        "        file_idx = header.index('FILE_ID')\n",
-        "        age_idx = header.index('AGE_AT_SCAN')\n",
-        "        sex_idx = header.index('SEX')\n",
-        "        dx_idx = header.index('DX_GROUP')\n",
-        "        mean_fd_idx = header.index('func_mean_fd')\n",
-        "    except Exception as exc:\n",
-        "        err_msg = 'Unable to extract header information from the pheno file: {0}\\nHeader should have pheno info:' \\\n",
-        "                  ' {1}\\nError: {2}'.format(s3_pheno_path, str(header), exc)\n",
-        "        raise Exception(err_msg)\n",
-        "\n",
-        "    # Go through pheno file and build download paths\n",
-        "    print('Collecting images of interest...')\n",
-        "    s3_paths = []\n",
-        "    for pheno_row in pheno_list[1:]:\n",
-        "\n",
-        "        # Comma separate the row\n",
-        "        cs_row = pheno_row.decode().split(',')\n",
-        "\n",
-        "        try:\n",
-        "            # See if it was preprocessed\n",
-        "            row_file_id = cs_row[file_idx]\n",
-        "            # Read in participant info\n",
-        "            row_site = cs_row[site_idx]\n",
-        "            row_age = float(cs_row[age_idx])\n",
-        "            row_sex = cs_row[sex_idx]\n",
-        "            row_dx = cs_row[dx_idx]\n",
-        "            row_mean_fd = float(cs_row[mean_fd_idx])\n",
-        "        except Exception as e:\n",
-        "            err_msg = 'Error extracting info from phenotypic file, skipping...'\n",
-        "            print(err_msg)\n",
-        "            continue\n",
-        "\n",
-        "        # If the filename isn't specified, skip\n",
-        "        if row_file_id == 'no_filename':\n",
-        "            continue\n",
-        "        # If mean fd is too large, skip\n",
-        "        if row_mean_fd >= mean_fd_thresh:\n",
-        "            continue\n",
-        "\n",
-        "        # Test phenotypic criteria (three if's looks cleaner than one long if)\n",
-        "        # Test sex\n",
-        "        if (sex == 'M' and row_sex != '1') or (sex == 'F' and row_sex != '2'):\n",
-        "            continue\n",
-        "\n",
-        "        if (diagnosis == 'asd' and row_dx != '1') or (diagnosis == 'tdc' and row_dx != '2'):\n",
-        "            continue\n",
-        "\n",
-        "        # Test site\n",
-        "        if site is not None and site.lower() != row_site.lower():\n",
-        "            continue\n",
-        "        # Test age range\n",
-        "        if greater_than < row_age < less_than:\n",
-        "            filename = row_file_id + '_' + derivative + extension\n",
-        "            s3_path = '/'.join([s3_prefix, 'Outputs', pipeline, strategy, derivative, filename])\n",
-        "            print('Adding {0} to download queue...'.format(s3_path))\n",
-        "            s3_paths.append(s3_path)\n",
-        "        else:\n",
-        "            continue\n",
-        "\n",
-        "    # And download the items\n",
-        "    total_num_files = len(s3_paths)\n",
-        "    for path_idx, s3_path in enumerate(s3_paths):\n",
-        "        rel_path = s3_path.lstrip(s3_prefix)\n",
-        "        download_file = os.path.join(out_dir, rel_path)\n",
-        "        download_dir = os.path.dirname(download_file)\n",
-        "        if not os.path.exists(download_dir):\n",
-        "            os.makedirs(download_dir)\n",
-        "        try:\n",
-        "            if not os.path.exists(download_file):\n",
-        "                print('Retrieving: {0}'.format(download_file))\n",
-        "                request.urlretrieve(s3_path, download_file)\n",
-        "                print('{0:3f}% percent complete'.format(100*(float(path_idx+1)/total_num_files)))\n",
-        "            else:\n",
-        "                print('File {0} already exists, skipping...'.format(download_file))\n",
-        "        except Exception as exc:\n",
-        "            print('There was a problem downloading {0}.\\n Check input arguments and try again.'.format(s3_path))\n",
-        "\n",
-        "    # Print all done\n",
-        "    print('Done!')\n",
-        "\n",
-        "\n",
-        "# Make module executable\n",
-        "if __name__ == '__main__':\n",
-        "\n",
-        "    # Import packages\n",
-        "    import argparse\n",
-        "    import os\n",
-        "    import sys\n",
-        "\n",
-        "    # Init argument parser\n",
-        "    parser = argparse.ArgumentParser(description=__doc__)\n",
-        "\n",
-        "    # Required arguments\n",
-        "    parser.add_argument('-a', '--asd', required=False, default=False, action='store_true',\n",
-        "                        help='Only download data for participants with ASD.'\n",
-        "                             ' Specifying neither or both -a and -c will download data from all participants.')\n",
-        "    parser.add_argument('-c', '--tdc', required=False, default=False, action='store_true',\n",
-        "                        help='Only download data for participants who are typically developing controls.'\n",
-        "                             ' Specifying neither or both -a and -c will download data from all participants.')\n",
-        "    parser.add_argument('-d', '--derivative', nargs=1, required=True, type=str,\n",
-        "                        help='Derivative of interest (e.g. \\'reho\\')')\n",
-        "    parser.add_argument('-p', '--pipeline', nargs=1, required=True, type=str,\n",
-        "                        help='Pipeline used to preprocess the data (e.g. \\'cpac\\')')\n",
-        "    parser.add_argument('-s', '--strategy', nargs=1, required=True, type=str,\n",
-        "                        help='Noise-removal strategy used during preprocessing (e.g. \\'nofilt_noglobal\\'')\n",
-        "    parser.add_argument('-o', '--out_dir', nargs=1, required=True, type=str,\n",
-        "                        help='Path to local folder to download files to')\n",
-        "\n",
-        "    # Optional arguments\n",
-        "    parser.add_argument('-lt', '--less_than', nargs=1, required=False,\n",
-        "                        type=float, help='Upper age threshold (in years) of participants to download (e.g. for '\n",
-        "                                         'subjects 30 or younger, \\'-lt 31\\')')\n",
-        "    parser.add_argument('-gt', '--greater_than', nargs=1, required=False,\n",
-        "                        type=int, help='Lower age threshold (in years) of participants to download (e.g. for '\n",
-        "                                       'subjects 31 or older, \\'-gt 30\\')')\n",
-        "    parser.add_argument('-t', '--site', nargs=1, required=False, type=str,\n",
-        "                        help='Site of interest to download from (e.g. \\'Caltech\\'')\n",
-        "    parser.add_argument('-x', '--sex', nargs=1, required=False, type=str,\n",
-        "                        help='Participant sex of interest to download only (e.g. \\'M\\' or \\'F\\')')\n",
-        "\n",
-        "    # Parse and gather arguments\n",
-        "    args = parser.parse_args()\n",
-        "\n",
-        "    # Init variables\n",
-        "    desired_derivative = args.derivative[0].lower()\n",
-        "    desired_pipeline = args.pipeline[0].lower()\n",
-        "    desired_strategy = args.strategy[0].lower()\n",
-        "    download_data_dir = os.path.abspath(args.out_dir[0])\n",
-        "\n",
-        "    # Try and init optional arguments\n",
-        "\n",
-        "    # for diagnosis if both ASD and TDC flags are set to true or false, we download both\n",
-        "    desired_diagnosis = ''\n",
-        "    if args.tdc == args.asd:\n",
-        "        desired_diagnosis = 'both'\n",
-        "        print('Downloading data for ASD and TDC participants')\n",
-        "    elif args.tdc:\n",
-        "        desired_diagnosis = 'tdc'\n",
-        "        print('Downloading data for TDC participants')\n",
-        "    elif args.asd:\n",
-        "        desired_diagnosis = 'asd'\n",
-        "        print('Downloading data for ASD participants')\n",
-        "\n",
-        "    try:\n",
-        "        desired_age_max = args.less_than[0]\n",
-        "        print('Using upper age threshold of {0:d}...'.format(desired_age_max))\n",
-        "    except TypeError:\n",
-        "        desired_age_max = 200.0\n",
-        "        print('No upper age threshold specified')\n",
-        "\n",
-        "    try:\n",
-        "        desired_age_min = args.greater_than[0]\n",
-        "        print('Using lower age threshold of {0:d}...'.format(desired_age_min))\n",
-        "    except TypeError:\n",
-        "        desired_age_min = -1.0\n",
-        "        print('No lower age threshold specified')\n",
-        "\n",
-        "    try:\n",
-        "        desired_site = args.site[0]\n",
-        "    except TypeError:\n",
-        "        desired_site = None\n",
-        "        print('No site specified, using all sites...')\n",
-        "\n",
-        "    try:\n",
-        "        desired_sex = args.sex[0].upper()\n",
-        "        if desired_sex == 'M':\n",
-        "            print('Downloading only male subjects...')\n",
-        "        elif desired_sex == 'F':\n",
-        "            print('Downloading only female subjects...')\n",
-        "        else:\n",
-        "            print('Please specify \\'M\\' or \\'F\\' for sex and try again')\n",
-        "            sys.exit()\n",
-        "    except TypeError:\n",
-        "        desired_sex = None\n",
-        "        print('No sex specified, using all sexes...')\n",
-        "\n",
-        "    # Call the collect and download routine\n",
-        "    collect_and_download(desired_derivative, desired_pipeline, desired_strategy, download_data_dir, desired_age_max,\n",
-        "                         desired_age_min, desired_site, desired_sex, desired_diagnosis)"
-      ]
-    }
-  ]
-}
+# download_abide_preproc.py
+#
+# Author: Daniel Clark, 2015
+# Updated to python 3 and to support downloading by DX, Cameron Craddock, 2019
+
+"""
+This script downloads data from the Preprocessed Connetomes Project's
+ABIDE Preprocessed data release and stores the files in a local
+directory; users specify derivative, pipeline, strategy, and optionally
+age ranges, sex, site of interest
+Usage:
+    python download_abide_preproc.py -d <derivative> -p <pipeline>
+                                     -s <strategy> -o <out_dir>
+                                     [-lt <less_than>] [-gt <greater_than>]
+                                     [-x <sex>] [-t <site>]
+"""
+
+
+# Main collect and download function
+def collect_and_download(derivative, pipeline, strategy, out_dir, less_than, greater_than, site, sex, diagnosis):
+    """
+    Function to collect and download images from the ABIDE preprocessed
+    directory on FCP-INDI's S3 bucket
+    Parameters
+    ----------
+    derivative : string
+        derivative or measure of interest
+    pipeline : string
+        pipeline used to process data of interest
+    strategy : string
+        noise removal strategy used to process data of interest
+    out_dir : string
+        filepath to a local directory to save files to
+    less_than : float
+        upper age (years) threshold for participants of interest
+    greater_than : float
+        lower age (years) threshold for participants of interest
+    site : string
+        acquisition site of interest
+    sex : string
+        'M' or 'F' to indicate whether to download male or female data
+    diagnosis : string
+        'asd', 'tdc', or 'both' corresponding to the diagnosis of the
+        participants for whom data should be downloaded
+    Returns
+    -------
+    None
+        this function does not return a value; it downloads data from
+        S3 to a local directory
+    :param derivative: 
+    :param pipeline: 
+    :param strategy: 
+    :param out_dir: 
+    :param less_than: 
+    :param greater_than: 
+    :param site: 
+    :param sex:
+    :param diagnosis:
+    :return: 
+    """
+
+    # Import packages
+    import os
+    import urllib.request as request
+
+    # Init variables
+    mean_fd_thresh = 0.2
+    s3_prefix = 'https://s3.amazonaws.com/fcp-indi/data/Projects/'\
+                'ABIDE_Initiative'
+    s3_pheno_path = '/'.join([s3_prefix, 'Phenotypic_V1_0b_preprocessed1.csv'])
+
+    # Format input arguments to be lower case, if not already
+    derivative = derivative.lower()
+    pipeline = pipeline.lower()
+    strategy = strategy.lower()
+
+    # Check derivative for extension
+    if 'roi' in derivative:
+        extension = '.1D'
+    else:
+        extension = '.nii.gz'
+
+    # If output path doesn't exist, create it
+    if not os.path.exists(out_dir):
+        print('Could not find {0}, creating now...'.format(out_dir))
+        os.makedirs(out_dir)
+
+    # Load the phenotype file from S3
+    s3_pheno_file = request.urlopen(s3_pheno_path)
+    pheno_list = s3_pheno_file.readlines()
+    print(pheno_list[0])
+
+    # Get header indices
+    header = pheno_list[0].decode().split(',')
+    try:
+        site_idx = header.index('SITE_ID')
+        file_idx = header.index('FILE_ID')
+        age_idx = header.index('AGE_AT_SCAN')
+        sex_idx = header.index('SEX')
+        dx_idx = header.index('DX_GROUP')
+        mean_fd_idx = header.index('func_mean_fd')
+    except Exception as exc:
+        err_msg = 'Unable to extract header information from the pheno file: {0}\nHeader should have pheno info:' \
+                  ' {1}\nError: {2}'.format(s3_pheno_path, str(header), exc)
+        raise Exception(err_msg)
+
+    # Go through pheno file and build download paths
+    print('Collecting images of interest...')
+    s3_paths = []
+    for pheno_row in pheno_list[1:]:
+
+        # Comma separate the row
+        cs_row = pheno_row.decode().split(',')
+
+        try:
+            # See if it was preprocessed
+            row_file_id = cs_row[file_idx]
+            # Read in participant info
+            row_site = cs_row[site_idx]
+            row_age = float(cs_row[age_idx])
+            row_sex = cs_row[sex_idx]
+            row_dx = cs_row[dx_idx]
+            row_mean_fd = float(cs_row[mean_fd_idx])
+        except Exception as e:
+            err_msg = 'Error extracting info from phenotypic file, skipping...'
+            print(err_msg)
+            continue
+
+        # If the filename isn't specified, skip
+        if row_file_id == 'no_filename':
+            continue
+        # If mean fd is too large, skip
+        if row_mean_fd >= mean_fd_thresh:
+            continue
+
+        # Test phenotypic criteria (three if's looks cleaner than one long if)
+        # Test sex
+        if (sex == 'M' and row_sex != '1') or (sex == 'F' and row_sex != '2'):
+            continue
+
+        if (diagnosis == 'asd' and row_dx != '1') or (diagnosis == 'tdc' and row_dx != '2'):
+            continue
+
+        # Test site
+        if site is not None and site.lower() != row_site.lower():
+            continue
+        # Test age range
+        if greater_than < row_age < less_than:
+            filename = row_file_id + '_' + derivative + extension
+            s3_path = '/'.join([s3_prefix, 'Outputs', pipeline, strategy, derivative, filename])
+            print('Adding {0} to download queue...'.format(s3_path))
+            s3_paths.append(s3_path)
+        else:
+            continue
+
+    # And download the items
+    total_num_files = len(s3_paths)
+    for path_idx, s3_path in enumerate(s3_paths):
+        rel_path = s3_path.lstrip(s3_prefix)
+        download_file = os.path.join(out_dir, rel_path)
+        download_dir = os.path.dirname(download_file)
+        if not os.path.exists(download_dir):
+            os.makedirs(download_dir)
+        try:
+            if not os.path.exists(download_file):
+                print('Retrieving: {0}'.format(download_file))
+                request.urlretrieve(s3_path, download_file)
+                print('{0:3f}% percent complete'.format(100*(float(path_idx+1)/total_num_files)))
+            else:
+                print('File {0} already exists, skipping...'.format(download_file))
+        except Exception as exc:
+            print('There was a problem downloading {0}.\n Check input arguments and try again.'.format(s3_path))
+
+    # Print all done
+    print('Done!')
+
+
+# Make module executable
+if __name__ == '__main__':
+
+    # Import packages
+    import argparse
+    import os
+    import sys
+
+    # Init argument parser
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Required arguments
+    parser.add_argument('-a', '--asd', required=False, default=False, action='store_true',
+                        help='Only download data for participants with ASD.'
+                             ' Specifying neither or both -a and -c will download data from all participants.')
+    parser.add_argument('-c', '--tdc', required=False, default=False, action='store_true',
+                        help='Only download data for participants who are typically developing controls.'
+                             ' Specifying neither or both -a and -c will download data from all participants.')
+    parser.add_argument('-d', '--derivative', nargs=1, required=True, type=str,
+                        help='Derivative of interest (e.g. \'reho\')')
+    parser.add_argument('-p', '--pipeline', nargs=1, required=True, type=str,
+                        help='Pipeline used to preprocess the data (e.g. \'cpac\')')
+    parser.add_argument('-s', '--strategy', nargs=1, required=True, type=str,
+                        help='Noise-removal strategy used during preprocessing (e.g. \'nofilt_noglobal\'')
+    parser.add_argument('-o', '--out_dir', nargs=1, required=True, type=str,
+                        help='Path to local folder to download files to')
+
+    # Optional arguments
+    parser.add_argument('-lt', '--less_than', nargs=1, required=False,
+                        type=float, help='Upper age threshold (in years) of participants to download (e.g. for '
+                                         'subjects 30 or younger, \'-lt 31\')')
+    parser.add_argument('-gt', '--greater_than', nargs=1, required=False,
+                        type=int, help='Lower age threshold (in years) of participants to download (e.g. for '
+                                       'subjects 31 or older, \'-gt 30\')')
+    parser.add_argument('-t', '--site', nargs=1, required=False, type=str,
+                        help='Site of interest to download from (e.g. \'Caltech\'')
+    parser.add_argument('-x', '--sex', nargs=1, required=False, type=str,
+                        help='Participant sex of interest to download only (e.g. \'M\' or \'F\')')
+
+    # Parse and gather arguments
+    args = parser.parse_args()
+
+    # Init variables
+    desired_derivative = args.derivative[0].lower()
+    desired_pipeline = args.pipeline[0].lower()
+    desired_strategy = args.strategy[0].lower()
+    download_data_dir = os.path.abspath(args.out_dir[0])
+
+    # Try and init optional arguments
+
+    # for diagnosis if both ASD and TDC flags are set to true or false, we download both
+    desired_diagnosis = ''
+    if args.tdc == args.asd:
+        desired_diagnosis = 'both'
+        print('Downloading data for ASD and TDC participants')
+    elif args.tdc:
+        desired_diagnosis = 'tdc'
+        print('Downloading data for TDC participants')
+    elif args.asd:
+        desired_diagnosis = 'asd'
+        print('Downloading data for ASD participants')
+
+    try:
+        desired_age_max = args.less_than[0]
+        print('Using upper age threshold of {0:d}...'.format(desired_age_max))
+    except TypeError:
+        desired_age_max = 200.0
+        print('No upper age threshold specified')
+
+    try:
+        desired_age_min = args.greater_than[0]
+        print('Using lower age threshold of {0:d}...'.format(desired_age_min))
+    except TypeError:
+        desired_age_min = -1.0
+        print('No lower age threshold specified')
+
+    try:
+        desired_site = args.site[0]
+    except TypeError:
+        desired_site = None
+        print('No site specified, using all sites...')
+
+    try:
+        desired_sex = args.sex[0].upper()
+        if desired_sex == 'M':
+            print('Downloading only male subjects...')
+        elif desired_sex == 'F':
+            print('Downloading only female subjects...')
+        else:
+            print('Please specify \'M\' or \'F\' for sex and try again')
+            sys.exit()
+    except TypeError:
+        desired_sex = None
+        print('No sex specified, using all sexes...')
+
+    # Call the collect and download routine
+    collect_and_download(desired_derivative, desired_pipeline, desired_strategy, download_data_dir, desired_age_max,
+                         desired_age_min, desired_site, desired_sex, desired_diagnosis)
